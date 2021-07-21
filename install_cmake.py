@@ -38,23 +38,23 @@ def download_check_installer(installer_url, installer_name):
         2**20, f'CMake installer file {installer_name} is less than 5 MB.'
 
 
-def install_check_cmake(installer_name, cmake_version, dir_install):
+def install_check_cmake(installer_name, cmake_version, install_dir):
     # Create the directory hierarchy if necessary
-    os.makedirs(dir_install, exist_ok=True)
+    os.makedirs(install_dir, exist_ok=True)
 
     # Run the installer
     install_proc = subprocess.run(
-        ['sh', installer_name, f'--prefix={dir_install}', '--exclude-subdir'],
+        ['sh', installer_name, f'--prefix={install_dir}', '--exclude-subdir'],
         capture_output=True,
         text=True)
 
     assert install_proc.returncode == 0, install_proc.stderr
     assert 'Unpacking finished successfully' in install_proc.stdout, install_proc.stdout
     assert cmake_version in install_proc.stdout, install_proc.stdout
-    assert dir_install in install_proc.stdout, install_proc.stdout
+    assert install_dir in install_proc.stdout, install_proc.stdout
 
     # Assert that the installed CMake file exists.
-    cmake_executable = os.path.join(dir_install, 'bin', 'cmake')
+    cmake_executable = os.path.join(install_dir, 'bin', 'cmake')
     assert os.path.isfile(
         cmake_executable
     ), f'CMake executable {cmake_executable} does not exist.'
@@ -64,12 +64,12 @@ def install_check_cmake(installer_name, cmake_version, dir_install):
                                 capture_output=True,
                                 text=True)
     assert cmake_proc.returncode == 0, cmake_proc.stderr
-    assert cmake_version in cmake_proc.stdout
+    assert cmake_version in cmake_proc.stdout, cmake_proc.stdout
     return cmake_executable
 
 
 # Create an Lmod module file
-def create_check_modulefile(module_base, cmake_version, dir_install):
+def create_check_modulefile(module_base, cmake_version, install_dir):
     module_name = os.path.join('cmake', cmake_version)
     # Create an Lmod module file
     module_file = os.path.join(module_base, module_name)
@@ -78,7 +78,7 @@ def create_check_modulefile(module_base, cmake_version, dir_install):
       puts stderr {{CMake {cmake_version}}}
     }}
     module-whatis {{CMake {cmake_version}}}
-    set root    {dir_install}
+    set root    {install_dir}
     conflict    cmake
     prepend-path    MANPATH         $root/man
     prepend-path    PATH            $root/bin
@@ -140,7 +140,7 @@ def main(module_base, module_dir):
         f'\x1b[1K\rLatest CMake: {cmake_version}, Installer: {installer_name}')
 
     # Install directory
-    dir_install = os.path.join(module_dir, cmake_version)
+    install_dir = os.path.join(module_dir, cmake_version)
     # Concat installer file name to base url
     installer_url = urllib.parse.urljoin(cmake_org_files_json, installer_name)
 
@@ -150,12 +150,12 @@ def main(module_base, module_dir):
     download_check_installer(installer_url, installer_name)
     print(f'\x1b[1K\rDownloaded {installer_name}.')
 
-    print(f'Installing CMake {cmake_version} in {dir_install}...',
+    print(f'Installing CMake {cmake_version} in {install_dir}...',
           end='',
           flush=True)
     cmake_executable = install_check_cmake(installer_name, cmake_version,
-                                           dir_install)
-    print(f'\x1b[1K\rInstalled CMake {cmake_version} in {dir_install}.')
+                                           install_dir)
+    print(f'\x1b[1K\rInstalled CMake {cmake_version} in {install_dir}.')
 
     print(f'Removing {installer_name}...', end='', flush=True)
     os.remove(installer_name)
@@ -163,7 +163,7 @@ def main(module_base, module_dir):
 
     print(f'Creating module file under {module_base}...', end='', flush=True)
     module_name = create_check_modulefile(module_base, cmake_version,
-                                          dir_install)
+                                          install_dir)
     print(f'\x1b[1K\rCreated module file {module_name} under {module_base}.')
 
     print(f'Check created module {module_name}...', end='', flush=True)

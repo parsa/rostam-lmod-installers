@@ -30,24 +30,24 @@ def download_check_archive(archive_name, archive_url):
         archive_name), f"Git tarball file {archive_name} does not exist."
 
 
-def install_check_git(dir_build, dir_install, git_version):
+def install_check_git(build_dir, install_dir, git_version):
     # Configure Git
     subprocess.run(
         [
-            "./configure", f"--prefix={dir_install}", "--with-editor=vim",
+            "./configure", f"--prefix={install_dir}", "--with-editor=vim",
             "--quiet"
         ],
-        cwd=dir_build,
+        cwd=build_dir,
         check=True,
     )
 
     # Install Git
     subprocess.run(["make", "install", f"-j{os.cpu_count()}", "-s"],
-                   cwd=dir_build,
+                   cwd=build_dir,
                    check=True)
 
     # Assert that the installed Git file exists.
-    git_executable = os.path.join(dir_install, "bin", "git")
+    git_executable = os.path.join(install_dir, "bin", "git")
     assert os.path.isfile(
         git_executable), f"Git executable {git_executable} does not exist."
 
@@ -63,7 +63,7 @@ def install_check_git(dir_build, dir_install, git_version):
     return git_executable
 
 
-def create_check_modulefile(git_version, module_base, dir_install):
+def create_check_modulefile(git_version, module_base, install_dir):
     module_name = os.path.join("git", git_version)
     # Create an Lmod module file
     module_file = os.path.join(module_base, module_name)
@@ -73,7 +73,7 @@ def create_check_modulefile(git_version, module_base, dir_install):
     puts stderr {{Git {git_version}}}
     }}
     module-whatis {{Git {git_version}}}
-    set root    {dir_install}
+    set root    {install_dir}
     conflict    git
     prepend-path    LD_LIBRARY_PATH $root/lib64
     prepend-path    LIBRARY_PATH    $root/lib64
@@ -149,35 +149,37 @@ def main(module_base, module_dir):
     download_check_archive(archive_name, archive_url)
     print(f"\x1b[1K\rDownloaded {archive_name}.")
 
-    # Extract Git tarball
+    # Extract the tarball
     print(f"Extracting {archive_name}...", end="", flush=True)
     with tarfile.open(archive_name, "r") as archive:
         archive.extractall()
     print(f"\x1b[1K\rExtracted {archive_name}.")
 
-    dir_build = ".".join(archive_name.split(".")[:-2])
-    dir_install = os.path.join(module_dir, git_version)
+    build_dir = ".".join(archive_name.split(".")[:-2])
+    install_dir = os.path.join(module_dir, git_version)
 
-    print(f"Installing Git {git_version} in {dir_install}...",
+    # Configure and install Git
+    print(f"Installing Git {git_version} in {install_dir}...",
           end="",
           flush=True)
-    # Install Git
-    git_executable = install_check_git(dir_build, dir_install, git_version)
-    print(f"\x1b[1K\rInstalled Git {git_version} in {dir_install}.")
+    git_executable = install_check_git(build_dir, install_dir, git_version)
+    print(f"\x1b[1K\rInstalled Git {git_version} in {install_dir}.")
 
-    print(f"Removing up {archive_name} and {dir_build}...", end="", flush=True)
     # Remove downloaded tarball and build directory
+    print(f"Removing up {archive_name} and {build_dir}...", end="", flush=True)
     os.remove(archive_name)
-    shutil.rmtree(dir_build, ignore_errors=True)
-    print(f"\x1b[1K\rRemoved {archive_name} and {dir_build}.")
+    shutil.rmtree(build_dir, ignore_errors=True)
+    print(f"\x1b[1K\rRemoved {archive_name} and {build_dir}.")
 
+    # Create a modulefile for Git
     print(f"Creating module file under {module_base}...", end="", flush=True)
-    module_name = create_check_modulefile(git_version, module_base, dir_install)
+    module_name = create_check_modulefile(git_version, module_base, install_dir)
     print(f"\x1b[1K\rCreated module file under {module_base}.")
 
-    print(f"Checking module file under {module_base}...", end="", flush=True)
+    # Check if the modulefile works
+    print(f"Check created module {module_base}...", end="", flush=True)
     check_module(module_name, git_version, git_executable)
-    print(f"\x1b[1K\rChecked module file under {module_base}.")
+    print(f"\x1b[1K\rChecked module file {module_name}.")
 
     print("Done.")
 
