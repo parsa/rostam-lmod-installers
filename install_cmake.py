@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 import urllib.parse
 import urllib.request
 
@@ -109,7 +108,7 @@ def check_module(module_name, cmake_version, cmake_executable):
                                 capture_output=True,
                                 text=True,
                                 env=dict(os.environ, LMOD_PAGER=''))
-    assert cmake_proc.returncode == 0, f'CMake executable is not in the PATH set by the Lmod modulefile.'
+    assert cmake_proc.returncode == 0, 'CMake executable is not in the PATH set by the Lmod modulefile.'
     assert os.path.samefile(
         cmake_proc.stdout.rstrip(), cmake_executable
     ), f'CMake executable loaded by Lmod is not the expected {cmake_version} verison. {cmake_proc.stdout}'
@@ -121,7 +120,7 @@ def check_module(module_name, cmake_version, cmake_executable):
         capture_output=True,
         text=True,
         env=dict(os.environ, LMOD_PAGER=''))
-    assert cmake_proc.returncode == 0, f'Failed to run the CMake executable.\n' + \
+    assert cmake_proc.returncode == 0, 'Failed to run the CMake executable.\n' + \
         cmake_proc.stderr
     assert cmake_version in cmake_proc.stdout, f'CMake executable loaded in the Lmod file is not the expected {cmake_version} version: {cmake_proc.stdout}'
 
@@ -176,8 +175,7 @@ def main(module_base, module_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description=
-        'Download the latest CMake installer from cmake.org and generate a module.'
+        description='Download the latest CMake installer from cmake.org and generate a module.'
     )
     parser.add_argument('--version', action='version', version='%(prog)s 1.0')
     parser.add_argument('--module-base-dir',
