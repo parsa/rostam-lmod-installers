@@ -139,7 +139,7 @@ def main(module_base, module_dir):
     # Extract Git version number from the tarball name
     git_version = ".".join(
         [x for x in re.split(r"-|\.", archive_name) if x.isdigit()])
-    print("\x1b[1K\rLatest Git version: " + git_version)
+    print(f"\x1b[1K\rLatest Git version: {git_version}, Tarball: {archive_name}")
 
     print(
         f"Downloading {archive_name} from {latest_url}...",
