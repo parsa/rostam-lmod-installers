@@ -140,7 +140,7 @@ def main(module_base, module_dir):
         f'\x1b[1K\rLatest CMake: {cmake_version}, Installer: {installer_name}')
 
     # Install directory
-    install_dir = os.path.join(module_dir, cmake_version)
+    install_dir = os.path.join(module_dir, 'cmake', cmake_version)
     # Concat installer file name to base url
     installer_url = urllib.parse.urljoin(cmake_org_files_json, installer_name)
 

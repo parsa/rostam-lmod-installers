@@ -156,7 +156,7 @@ def main(module_base, module_dir):
     print(f"\x1b[1K\rExtracted {archive_name}.")
 
     build_dir = ".".join(archive_name.split(".")[:-2])
-    install_dir = os.path.join(module_dir, git_version)
+    install_dir = os.path.join(module_dir, 'git', git_version)
 
     # Configure and install Git
     print(f"Installing Git {git_version} in {install_dir}...",

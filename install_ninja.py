@@ -3,19 +3,22 @@
 # Get the lastest version of Ninja from GitHub
 
 import argparse
-import json
 import os
+import stat
 import subprocess
-import urllib.request
 import zipfile
+
+import requests
 
 
 def query_latest_release(release_info_url):
     # Get Ninja release info from GitHub as a JSON object
-    release_info = json.load(urllib.request.urlopen(release_info_url))
+    http_response = requests.get(release_info_url)
+    assert http_response.status_code == 200
+    release_info = http_response.json()
 
     # Get the latest version of Ninja
-    ninja_version = release_info["tag_name"]
+    ninja_version = release_info["tag_name"].lstrip('v')
 
     # Get the download URL for the latest Linux version of Ninja
     linux_assets = [asset for asset in release_info['assets']
@@ -29,9 +32,10 @@ def query_latest_release(release_info_url):
 
 def download_check_archive(download_url, dest_file):
     # Download the latest version of Ninja
-    http_result = urllib.request.urlretrieve(download_url, dest_file)
-    assert http_result[1].getcode(
-    ) == 200, f"Download from {download_url} failed."
+    http_response = requests.get(download_url)
+    assert http_response.status_code == 200, f"Download from {download_url} failed."
+    with open(dest_file, 'wb') as dest_file_handle:
+        dest_file_handle.write(http_response.content)
 
     # Assert that the downloaded file at dest_file is a zip file
     assert zipfile.is_zipfile(
@@ -40,10 +44,13 @@ def download_check_archive(download_url, dest_file):
 
 def install_check_ninja(ninja_version, install_dir):
     # Check that the Ninja executable exists in the current directory
-    ninja_exe_cur = os.path.abspath(os.getcwd(), 'ninja')
+    ninja_exe_cur = os.path.abspath('ninja')
     # Assert the ninja executable path is correct
     assert os.path.isfile(
         ninja_exe_cur), f"The ninja executable {ninja_exe_cur} does not exist."
+    # Mark ninja as executable
+    os.chmod(ninja_exe_cur, os.stat(ninja_exe_cur).st_mode | stat.S_IEXEC)
+
     # Assert ninja is executable
     assert os.access(
         ninja_exe_cur, os.X_OK), f"The ninja executable {ninja_exe_cur} is not executable."
@@ -64,7 +71,7 @@ def install_check_ninja(ninja_version, install_dir):
         f'{ninja_executable} is not executable.'
     # Assert that the installed Ninja is the correct version
     ninja_proc = subprocess.run(
-        [ninja_executable, '-v'],
+        [ninja_executable, '--version'],
         capture_output=True, text=True)
     assert ninja_proc.returncode == 0, ninja_proc.stderr
     assert ninja_version in ninja_proc.stdout, ninja_proc.stdout
@@ -115,7 +122,7 @@ def check_module(module_name, ninja_version, ninja_executable):
     # Make sure the ninja executable is in the path works and is the version
     # we expected.
     ninja_proc = subprocess.run(
-        f'module load {module_name} && ninja -v',
+        f'module load {module_name} && ninja --version',
         shell=True,
         capture_output=True,
         text=True,
@@ -132,18 +139,20 @@ def main(module_base, module_dir):
     print(f'Using module base directory {module_base}.')
 
     # Get the latest Ninja release info from GitHub
+    print('Querying GitHub for the latest Ninja release info...', end='', flush=True)
     release_info_url = "https://api.github.com/repos/ninja-build/ninja/releases/latest"
     ninja_version, download_url = query_latest_release(release_info_url)
+    print(f"\x1b[1K\rLatest Ninja version: {ninja_version}.")
 
     # Target download file name
     archive_name = "ninja.zip"
 
     # Download the latest version of Ninja
-    print(f'Downloading {installer_url} to {installer_name}...',
+    print(f'Downloading {download_url} to {archive_name}...',
           end='',
           flush=True)
     download_check_archive(download_url, archive_name)
-    print(f'\x1b[1K\rDownloaded {installer_name}.')
+    print(f'\x1b[1K\rDownloaded {archive_name}.')
 
     # Unzip the archive
     print(f"Extracting {archive_name}...", end="", flush=True)
@@ -152,7 +161,7 @@ def main(module_base, module_dir):
             zip_ref.extract(file, ".")
     print(f"\x1b[1K\rExtracted {archive_name}.")
 
-    install_dir = os.path.join(module_dir, ninja_version)
+    install_dir = os.path.join(module_dir, 'ninja', ninja_version)
 
     print(f"Moving Ninja {ninja_version} binary to {install_dir}...",
           end="",
@@ -176,6 +185,8 @@ def main(module_base, module_dir):
     print(f'Check created module {module_base}...', end='', flush=True)
     check_module(module_name, ninja_version, ninja_executable)
     print(f'\x1b[1K\rChecked created module {module_name}.')
+
+    print("Done.")
 
 
 if __name__ == '__main__':
