@@ -1,0 +1,13 @@
+yum install gcc-c++ make wget curl python3 python3-pip tcl-devel procps-ng
+pip3 install jupyterlab
+wget https://sourceforge.net/projects/modules/files/Modules/modules-4.8.0/modules-4.8.0.tar.gz
+tar xf modules-4.8.0.tar.gz
+pip3 install ipykernel
+cd modules-4.8.0
+make -s -j4 install
+cd -
+rm -rf modules-4.8.0/ modules-4.8.0.tar.gz
+source /usr/local/Modules/init/bash
+source /usr/local/Modules/init/bash_completion
+./install_git.py 
+mkdir -p ~/.local/modules

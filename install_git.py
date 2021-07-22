@@ -1,6 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
+# Python version must be at least 3.6
+import sys
+if sys.version_info[0] < 3 or sys.version_info[1] < 6:
+    print("Python version must be at least 3.6")
+    sys.exit(1)
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -8,17 +15,51 @@ import subprocess
 import tarfile
 import urllib.parse
 import urllib.request
+import textwrap
 
 
 # Detect latest Git release from its kernel.org webpage
 def query_latest_git_release(latest_url):
-    latest_html = urllib.request.urlopen(latest_url).read().decode("utf-8")
-    # releases = re.findall(r'(?<=git-).[0-9.]*(?=.tar.gz)', latest_html)
-    # return max(releases, key=lambda k: [int(x) for x in k.split('.')])
-    releases = re.findall(r"[a-z-\.0-9]+\.tar\.xz", latest_html)
-    return max(
-        releases,
-        key=lambda k: [int(x) for x in re.split(r"-|\.", k) if x.isdigit()])
+    def query_kernel_org(url):
+        latest_html = urllib.request.urlopen(latest_url).read().decode("utf-8")
+        # releases = re.findall(r'(?<=git-).[0-9.]*(?=.tar.gz)', latest_html)
+        # return max(releases, key=lambda k: [int(x) for x in k.split('.')])
+        releases = re.findall(r"[a-z-\.0-9]+\.tar\.xz", latest_html)
+        archive_name = max(
+            releases, key=lambda k: [
+                int(x) for x in re.split(
+                    r"-|\.", k) if x.isdigit()])
+        archive_url = urllib.parse.urljoin(latest_url, archive_name)
+        return archive_name, archive_url
+
+    def query_github(url):
+        # Get Git release info from GitHub as a JSON object
+        with urllib.request.urlopen(url) as http_response:
+            assert http_response.status == 200
+            git_release_info = http_response.read().decode("utf-8")
+
+        # Load HTTP response as a JSON object
+        tags_info = json.loads(git_release_info)
+        # Remove tags that include "-rc"
+        tags_info = [tag for tag in tags_info if "-rc" not in tag["name"]]
+        # Get the latest version of Git
+        # Lambda that removes the "v" prefix and converts version string to a
+        # list of integers
+
+        def get_version(v):
+            return [int(x) for x in v.lstrip("v").split(".")]
+        latest_tag = max(tags_info, key=get_version)
+        git_version = latest_tag["name"].lstrip("v")
+        # Get the download URL for the latest Git tarball
+        download_url = latest_tag["tarball_url"]
+        return git_version, download_url
+
+    if "kernel.org" in latest_url:
+        return query_kernel_org(latest_url)
+    elif "github.com" in latest_url:
+        return query_github(latest_url)
+    else:
+        raise ValueError(f"Unsupported URL: {latest_url}")
 
 
 def download_check_archive(archive_name, archive_url):
@@ -67,8 +108,10 @@ def create_check_modulefile(git_version, module_base, install_dir):
     module_name = os.path.join("git", git_version)
     # Create an Lmod module file
     module_file = os.path.join(module_base, module_name)
+    os.makedirs(os.path.dirname(module_file), exist_ok=True)
 
-    module_file_content = f"""#%Module
+    module_file_content = textwrap.dedent(f"""\
+    #%Module
     proc ModulesHelp {{ }} {{
     puts stderr {{Git {git_version}}}
     }}
@@ -79,7 +122,7 @@ def create_check_modulefile(git_version, module_base, install_dir):
     prepend-path    LIBRARY_PATH    $root/lib64
     prepend-path    MANPATH         $root/share/man
     prepend-path    PATH            $root/bin
-    """
+    """)
 
     with open(module_file, "w") as fh:
         fh.write(module_file_content)
@@ -132,20 +175,21 @@ def main(module_base, module_dir):
     print(f"Using module base directory {module_base}.")
 
     latest_url = "https://mirrors.edge.kernel.org/pub/software/scm/git/"
+    # latest_url = "https://api.github.com/repos/git/git/tags"
 
-    print("Query latest Git release...", end="", flush=True)
-    archive_name = query_latest_git_release(latest_url)
+    print(f"Querying {latest_url} for latest Git release...", end="", flush=True)
+    archive_name, archive_url = query_latest_git_release(latest_url)
 
     # Extract Git version number from the tarball name
     git_version = ".".join(
         [x for x in re.split(r"-|\.", archive_name) if x.isdigit()])
-    print(f"\x1b[1K\rLatest Git version: {git_version}, Tarball: {archive_name}")
+    print(
+        f"\x1b[1K\rLatest Git version: {git_version}, Tarball: {archive_name}")
 
     print(
-        f"Downloading {archive_name} from {latest_url}...",
+        f"Downloading {archive_name} from {archive_url}...",
         end="",
         flush=True)
-    archive_url = urllib.parse.urljoin(latest_url, archive_name)
     download_check_archive(archive_name, archive_url)
     print(f"\x1b[1K\rDownloaded {archive_name}.")
 

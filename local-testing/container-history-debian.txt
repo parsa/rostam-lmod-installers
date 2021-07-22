@@ -1,0 +1,33 @@
+apt update &>/dev/null
+apt install -y wget curl g++ make tcl-dev procps less python3-pip gettext
+pip3 install --upgrade ipykernel
+pip3 install --upgrade yapf autopep8 black
+pip3 install --upgrade mypy flake8 bandit pylint pylama pydocstyle pycodestyle
+./install_modules.sh
+
+mkdir -p /root/.local/modules
+./install_git.py
+./install_gnu_parallel.sh
+./install_cmake.py
+./install_ninja.py
+
+
+
+
+
+#echo source /usr/local/Modules/init/bash >>~/.bashrc
+#echo source /usr/local/Modules/init/bash_completion >>~/.bashrc
+#echo module use ~/.local/modules >>~/.bashrc
+module load git
+module load cmake
+module load parallel
+module load git cmake parallel ninja
+
+#pkill -f vscode
+
+
+
+
+ls -l ninja-1.10.2/src/browse.py
+chmod +x ninja-1.10.2/src/browse.py
+chmod +x ninja-1.10.2/src/inline.sh

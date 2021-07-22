@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 
+# Python version must be at least 3.6
+import sys
+if sys.version_info[0] < 3 or sys.version_info[1] < 6:
+    print("Python version must be at least 3.6")
+    sys.exit(1)
+
 # Get the lastest version of Ninja from GitHub
 
 import argparse
+import json
 import os
 import stat
+import shutil
 import subprocess
+import textwrap
+import urllib.request
 import zipfile
-
-import requests
 
 
 def query_latest_release(release_info_url):
     # Get Ninja release info from GitHub as a JSON object
-    http_response = requests.get(release_info_url)
-    assert http_response.status_code == 200
-    release_info = http_response.json()
+    with urllib.request.urlopen(release_info_url) as http_response:
+        assert http_response.status == 200, f"Failed to get release info from {release_info_url}"
+        release_info = json.loads(http_response.read().decode('utf-8'))
 
     # Get the latest version of Ninja
     ninja_version = release_info["tag_name"].lstrip('v')
@@ -32,10 +40,10 @@ def query_latest_release(release_info_url):
 
 def download_check_archive(download_url, dest_file):
     # Download the latest version of Ninja
-    http_response = requests.get(download_url)
-    assert http_response.status_code == 200, f"Download from {download_url} failed."
-    with open(dest_file, 'wb') as dest_file_handle:
-        dest_file_handle.write(http_response.content)
+    with urllib.request.urlopen(download_url) as http_response:
+        assert http_response.status == 200, f"Failed to download {download_url}"
+        with open(dest_file, 'wb') as dest_file_handle:
+            dest_file_handle.write(http_response.read())
 
     # Assert that the downloaded file at dest_file is a zip file
     assert zipfile.is_zipfile(
@@ -60,7 +68,7 @@ def install_check_ninja(ninja_version, install_dir):
 
     # Move the executable to the install directory
     ninja_executable = os.path.join(install_dir, 'ninja')
-    os.rename(ninja_exe_cur, ninja_executable)
+    shutil.move(ninja_exe_cur, ninja_executable)
 
     # Assert that the installed Ninja file exists.
     assert os.path.isfile(os.path.join(install_dir, 'ninja')), \
@@ -83,14 +91,17 @@ def install_check_ninja(ninja_version, install_dir):
 def create_check_modulefile(module_base, ninja_version, install_dir):
     module_name = os.path.join('ninja', ninja_version)
     module_file = os.path.join(module_base, module_name)
-    module_file_content = f"""#%Module
+    os.makedirs(os.path.dirname(module_file), exist_ok=True)
+
+    module_file_content = textwrap.dedent(f"""\
+    #%Module
     proc ModulesHelp {{ }} {{
     puts stderr {{Ninja {ninja_version}}}
     }}
     module-whatis {{Ninja {ninja_version}}}
     set root    {install_dir}
     conflict    ninja
-    prepend-path    PATH            $root"""
+    prepend-path    PATH            $root""")
 
     with open(module_file, 'w') as fh:
         fh.write(module_file_content)

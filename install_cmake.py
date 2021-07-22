@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
+# Python version must be at least 3.6
+import sys
+if sys.version_info[0] < 3 or sys.version_info[1] < 6:
+    print("Python version must be at least 3.6")
+    sys.exit(1)
+
 import argparse
 import json
 import os
 import subprocess
 import urllib.parse
 import urllib.request
+import textwrap
 
 
 def query_cmake_org_latest_files(cmake_org_files_json):
@@ -73,7 +80,10 @@ def create_check_modulefile(module_base, cmake_version, install_dir):
     module_name = os.path.join('cmake', cmake_version)
     # Create an Lmod module file
     module_file = os.path.join(module_base, module_name)
-    module_file_content = f'''#%Module
+    os.makedirs(os.path.dirname(module_file), exist_ok=True)
+
+    module_file_content = textwrap.dedent(f'''\
+    #%Module
     proc ModulesHelp {{ }} {{
       puts stderr {{CMake {cmake_version}}}
     }}
@@ -84,7 +94,7 @@ def create_check_modulefile(module_base, cmake_version, install_dir):
     prepend-path    PATH            $root/bin
     prepend-path    ACLOCAL_PATH    $root/share/aclocal
     setenv          CMAKE_COMMAND   $root/bin/cmake
-    setenv          CMAKE_VERSION   {cmake_version}'''
+    setenv          CMAKE_VERSION   {cmake_version}''')
 
     with open(module_file, 'w') as fh:
         fh.write(module_file_content)
